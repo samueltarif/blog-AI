@@ -7,7 +7,7 @@ import { useAuth } from '@/lib/auth-context';
 import { handleFirestoreError, OperationType } from '@/lib/firebase-utils';
 import { compressImage } from '@/lib/image-utils';
 import { dispatchWebhooks } from '@/lib/webhook-utils';
-import { GoogleGenAI, Type } from '@google/genai';
+import { GoogleGenAI } from '@google/genai';
 import { Sparkles, FileText, Check, Loader2, ArrowRight, Save, Calendar } from 'lucide-react';
 
 const getAi = () => {
@@ -54,24 +54,19 @@ export default function NewPostPage() {
       console.log('[BRIEF] Chamando Gemini gemini-3-flash-preview...');
       const response = await getAi().models.generateContent({
         model: 'gemini-3-flash-preview',
-        contents: `Create a research brief for a blog post based on this idea: "${aiContext}". Tone: ${aiTone}.`,
+        contents: `Crie um rascunho de pesquisa para um post de blog baseado nesta ideia: "${aiContext}". Tom: ${aiTone}.
+Responda APENAS com um JSON válido neste formato exato, sem markdown, sem blocos de código:
+{"proposedTitle":"...","keyPoints":["...","..."],"targetAudience":"...","suggestedExcerpt":"..."}`,
         config: {
           tools: [{ googleSearch: {} }],
-          responseMimeType: 'application/json',
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              proposedTitle: { type: Type.STRING },
-              keyPoints: { type: Type.ARRAY, items: { type: Type.STRING } },
-              targetAudience: { type: Type.STRING },
-              suggestedExcerpt: { type: Type.STRING }
-            }
-          }
         }
       });
       console.log('[BRIEF] Resposta bruta do Gemini:', response);
       console.log('[BRIEF] response.text:', response.text);
-      const brief = JSON.parse(response.text || '{}');
+      const rawText = response.text || '{}';
+      // extrai JSON mesmo que venha com markdown ao redor
+      const jsonMatch = rawText.match(/\{[\s\S]*\}/);
+      const brief = JSON.parse(jsonMatch ? jsonMatch[0] : '{}');
       console.log('[BRIEF] Brief parseado:', brief);
       setAiBrief(brief);
       setTitle(brief.proposedTitle || '');
