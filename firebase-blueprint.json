@@ -1,0 +1,80 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "A user of the blog platform",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string", "format": "email" },
+        "role": { "type": "string", "enum": ["admin", "user"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["email", "role", "createdAt"]
+    },
+    "Post": {
+      "title": "Post",
+      "description": "A blog post",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "body": { "type": "string" },
+        "excerpt": { "type": "string" },
+        "coverImageUrl": { "type": "string" },
+        "status": { "type": "string", "enum": ["draft", "scheduled", "published"] },
+        "publishedAt": { "type": "string", "format": "date-time" },
+        "scheduledAt": { "type": "string", "format": "date-time" },
+        "aiGenerated": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "authorId": { "type": "string" }
+      },
+      "required": ["title", "body", "status", "createdAt", "updatedAt", "authorId"]
+    },
+    "TopicQueue": {
+      "title": "Topic Queue",
+      "description": "A queue of topics for AI generation",
+      "type": "object",
+      "properties": {
+        "topic": { "type": "string" },
+        "tone": { "type": "string" },
+        "context": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "processing", "completed", "failed"] },
+        "scheduledAt": { "type": "string", "format": "date-time" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "authorId": { "type": "string" }
+      },
+      "required": ["topic", "tone", "status", "createdAt", "authorId"]
+    },
+    "Integration": {
+      "title": "Integration",
+      "description": "A webhook integration",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "url": { "type": "string", "format": "uri" },
+        "isActive": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "authorId": { "type": "string" }
+      },
+      "required": ["name", "url", "isActive", "createdAt", "authorId"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/User" },
+      "description": "Users collection"
+    },
+    "/posts/{postId}": {
+      "schema": { "$ref": "#/entities/Post" },
+      "description": "Posts collection"
+    },
+    "/topic_queue/{queueId}": {
+      "schema": { "$ref": "#/entities/TopicQueue" },
+      "description": "Topic queue collection"
+    },
+    "/integrations/{integrationId}": {
+      "schema": { "$ref": "#/entities/Integration" },
+      "description": "Integrations collection"
+    }
+  }
+}
