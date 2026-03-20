@@ -10,7 +10,11 @@ import { dispatchWebhooks } from '@/lib/webhook-utils';
 import { GoogleGenAI, Type } from '@google/genai';
 import { Sparkles, FileText, Check, Loader2, ArrowRight, Save, Calendar } from 'lucide-react';
 
-const getAi = () => new GoogleGenAI({ apiKey: process.env.NEXT_PUBLIC_GEMINI_API_KEY || 'dummy' });
+const getAi = () => {
+  const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
+  console.log('[AI] NEXT_PUBLIC_GEMINI_API_KEY presente:', !!apiKey, '| primeiros chars:', apiKey?.slice(0, 8));
+  return new GoogleGenAI({ apiKey: apiKey || 'dummy' });
+};
 
 export default function NewPostPage() {
   const router = useRouter();
@@ -37,7 +41,12 @@ export default function NewPostPage() {
     setAiBrief(null);
     setMode('ai-brief');
     
+    console.log('[BRIEF] Iniciando geração de rascunho...');
+    console.log('[BRIEF] Contexto:', aiContext);
+    console.log('[BRIEF] Tom:', aiTone);
+
     try {
+      console.log('[BRIEF] Chamando Gemini gemini-3-flash-preview...');
       const response = await getAi().models.generateContent({
         model: 'gemini-3-flash-preview',
         contents: `Create a research brief for a blog post based on this idea: "${aiContext}". Tone: ${aiTone}.`,
@@ -55,12 +64,18 @@ export default function NewPostPage() {
           }
         }
       });
+      console.log('[BRIEF] Resposta bruta do Gemini:', response);
+      console.log('[BRIEF] response.text:', response.text);
       const brief = JSON.parse(response.text || '{}');
+      console.log('[BRIEF] Brief parseado:', brief);
       setAiBrief(brief);
       setTitle(brief.proposedTitle || '');
       setExcerpt(brief.suggestedExcerpt || '');
-    } catch (error) {
-      console.error(error);
+    } catch (error: any) {
+      console.error('[BRIEF] ERRO ao gerar rascunho:', error);
+      console.error('[BRIEF] Mensagem:', error?.message);
+      console.error('[BRIEF] Status:', error?.status);
+      console.error('[BRIEF] Stack:', error?.stack);
       alert('Falha ao gerar rascunho. Tente novamente.');
       setMode('ai-context');
     } finally {
@@ -74,7 +89,12 @@ export default function NewPostPage() {
     setBody('');
     setCoverImageUrl('');
     
+    console.log('[CONTENT] Iniciando geração de conteúdo completo...');
+    console.log('[CONTENT] Brief:', JSON.stringify(aiBrief));
+    console.log('[CONTENT] Título atual:', title);
+
     try {
+      console.log('[CONTENT] Chamando Gemini gemini-3.1-pro-preview para texto...');
       const textResponse = await getAi().models.generateContent({
         model: 'gemini-3.1-pro-preview',
         contents: `Escreva um post completo de blog em formato Markdown baseado neste rascunho: ${JSON.stringify(aiBrief)}. Tom: ${aiTone}.`,
@@ -82,30 +102,43 @@ export default function NewPostPage() {
           systemInstruction: 'Você é um redator de blog profissional. Escreva um post completo e bem estruturado. Limite o tamanho a cerca de 1500 palavras para evitar limites de token.'
         }
       });
+      console.log('[CONTENT] Resposta de texto recebida. Tamanho:', textResponse.text?.length);
       setBody(textResponse.text || '');
 
       try {
+        console.log('[CONTENT] Chamando Gemini gemini-2.5-flash-image para imagem...');
         const imageResponse = await getAi().models.generateContent({
           model: 'gemini-2.5-flash-image',
           contents: { parts: [{ text: `A highly detailed, professional blog cover image for a post titled: "${title}". Tone: ${aiTone}.` }] },
           config: { imageConfig: { aspectRatio: '16:9' } }
         });
+        console.log('[CONTENT] Resposta de imagem recebida:', imageResponse);
+        console.log('[CONTENT] Candidates:', imageResponse.candidates?.length);
         
         for (const part of imageResponse.candidates?.[0]?.content?.parts || []) {
+          console.log('[CONTENT] Part type:', part.text ? 'text' : part.inlineData ? 'inlineData' : 'outro');
           if (part.inlineData) {
+            console.log('[CONTENT] inlineData mimeType:', part.inlineData.mimeType, '| tamanho base64:', part.inlineData.data?.length);
             const base64 = `data:image/png;base64,${part.inlineData.data}`;
             const compressed = await compressImage(base64, 800, 0.7);
+            console.log('[CONTENT] Imagem comprimida. Tamanho final:', compressed.length);
             setCoverImageUrl(compressed);
             break;
           }
         }
-      } catch (imgError) {
-        console.error('Falha na geração da imagem', imgError);
+      } catch (imgError: any) {
+        console.error('[CONTENT] ERRO na geração da imagem:', imgError);
+        console.error('[CONTENT] Mensagem:', imgError?.message);
+        console.error('[CONTENT] Status:', imgError?.status);
       }
       
       setMode('preview');
-    } catch (error) {
-      console.error(error);
+      console.log('[CONTENT] Geração concluída com sucesso.');
+    } catch (error: any) {
+      console.error('[CONTENT] ERRO ao gerar conteúdo:', error);
+      console.error('[CONTENT] Mensagem:', error?.message);
+      console.error('[CONTENT] Status:', error?.status);
+      console.error('[CONTENT] Stack:', error?.stack);
       alert('Falha ao gerar o conteúdo. O limite de tokens pode ter sido excedido. Tente novamente com um tópico mais específico.');
       setMode('ai-brief');
     } finally {
@@ -114,8 +147,12 @@ export default function NewPostPage() {
   };
 
   const handleSave = async (publishStatus: 'draft' | 'scheduled' | 'published') => {
-    if (!user) return;
+    if (!user) {
+      console.error('[SAVE] Usuário não autenticado!');
+      return;
+    }
     setIsProcessing(true);
+    console.log('[SAVE] Salvando post com status:', publishStatus);
     try {
       const now = new Date().toISOString();
       const postData = {
@@ -126,14 +163,20 @@ export default function NewPostPage() {
         aiGenerated: mode === 'preview',
         createdAt: now, updatedAt: now, authorId: user.uid
       };
+      console.log('[SAVE] Dados do post:', { ...postData, body: postData.body?.slice(0, 100) + '...', coverImageUrl: postData.coverImageUrl?.slice(0, 50) + '...' });
       const docRef = await addDoc(collection(db, 'posts'), postData);
+      console.log('[SAVE] Post salvo com ID:', docRef.id);
       
       if (publishStatus === 'published') {
+        console.log('[SAVE] Disparando webhooks...');
         await dispatchWebhooks({ id: docRef.id, ...postData });
       }
       
       router.push('/admin/posts');
-    } catch (error) {
+    } catch (error: any) {
+      console.error('[SAVE] ERRO ao salvar post:', error);
+      console.error('[SAVE] Mensagem:', error?.message);
+      console.error('[SAVE] Code:', error?.code);
       handleFirestoreError(error, OperationType.CREATE, 'posts');
     } finally {
       setIsProcessing(false);
