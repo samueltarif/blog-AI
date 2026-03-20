@@ -16,6 +16,11 @@ const getAi = () => {
   return new GoogleGenAI({ apiKey: apiKey || 'dummy' });
 };
 
+// Log executado no momento que o módulo carrega (aparece mesmo sem interação)
+console.log('[PAGE LOAD] NewPostPage carregado');
+console.log('[PAGE LOAD] GEMINI KEY presente:', !!process.env.NEXT_PUBLIC_GEMINI_API_KEY);
+console.log('[PAGE LOAD] GEMINI KEY valor:', process.env.NEXT_PUBLIC_GEMINI_API_KEY?.slice(0, 10) || 'UNDEFINED/VAZIO');
+
 export default function NewPostPage() {
   const router = useRouter();
   const { user } = useAuth();
